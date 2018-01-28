@@ -1,5 +1,6 @@
 
 from utils import *
+from collections import Counter
 
 
 row_units = [cross(r, cols) for r in rows]
@@ -13,7 +14,7 @@ unitlist = unitlist
 units = dict((s, [u for u in unitlist if s in u]) for s in boxes)
 peers = dict((s, set(sum(units[s],[]))-set([s])) for s in boxes)
 
-
+# TODO: Implement this function!
 def naked_twins(values):
     """Eliminate values using the naked twins strategy.
 
@@ -41,93 +42,95 @@ def naked_twins(values):
     and because it is simpler (since the reduce_puzzle function already calls this
     strategy repeatedly).
     """
-    # TODO: Implement this function!
-    raise NotImplementedError
+    new_values = values.copy()
+    twins = None
+    for units in unitlist:
+        units_values = {}
+        for box in units:
+            if len(values[box]) == 2:
+                units_values[box] = values[box]
+        rev_multidict = {}
+        for key, value in units_values.items():
+            rev_multidict.setdefault(value, set()).add(key)
+        twins = [(key, values) for key, values in rev_multidict.items() if len(values) > 1]
+        if len(twins):
+            for twin in twins:
+                value = twin[0]
+                boxes = twin[1]
+                for box in units:
+                    if box not in boxes:
+                        new_values[box] = values[box].replace(value, '')
+    return new_values
 
 
 def eliminate(values):
-    """Apply the eliminate strategy to a Sudoku puzzle
-
-    The eliminate strategy says that if a box has a value assigned, then none
-    of the peers of that box can have the same value.
-
-    Parameters
-    ----------
-    values(dict)
-        a dictionary of the form {'box_name': '123456789', ...}
-
-    Returns
-    -------
-    dict
-        The values dictionary with the assigned values eliminated from peers
     """
-    # TODO: Copy your code from the classroom to complete this function
-    raise NotImplementedError
+    Go through all the boxes, and whenever there is a box with a value, eliminate this value from the values of all its peers.
+    Input: A sudoku in dictionary form.
+    Output: The resulting sudoku in dictionary form.
+    """
+    solved_values = [box for box in values.keys() if len(values[box]) == 1]
+    for box in solved_values:
+        digit = values[box]
+        for peer in peers[box]:
+            values[peer] = values[peer].replace(digit,'')
+    return values
 
 
 def only_choice(values):
-    """Apply the only choice strategy to a Sudoku puzzle
-
-    The only choice strategy says that if only one box in a unit allows a certain
-    digit, then that box must be assigned that digit.
-
-    Parameters
-    ----------
-    values(dict)
-        a dictionary of the form {'box_name': '123456789', ...}
-
-    Returns
-    -------
-    dict
-        The values dictionary with all single-valued boxes assigned
-
-    Notes
-    -----
-    You should be able to complete this function by copying your code from the classroom
     """
-    # TODO: Copy your code from the classroom to complete this function
-    raise NotImplementedError
+    Go through all the units, and whenever there is a unit with a value that only fits in one box, assign the value to this box.
+    Input: A sudoku in dictionary form.
+    Output: The resulting sudoku in dictionary form.
+    """
+    for unit in unitlist:
+        for digit in '123456789':
+            dplaces = [box for box in unit if digit in values[box]]
+            if len(dplaces) == 1:
+                values[dplaces[0]] = digit
+    return values
 
 
 def reduce_puzzle(values):
-    """Reduce a Sudoku puzzle by repeatedly applying all constraint strategies
-
-    Parameters
-    ----------
-    values(dict)
-        a dictionary of the form {'box_name': '123456789', ...}
-
-    Returns
-    -------
-    dict or False
-        The values dictionary after continued application of the constraint strategies
-        no longer produces any changes, or False if the puzzle is unsolvable 
     """
-    # TODO: Copy your code from the classroom and modify it to complete this function
-    raise NotImplementedError
+    Iterate eliminate() and only_choice(). If at some point, there is a box with no available values, return False.
+    If the sudoku is solved, return the sudoku.
+    If after an iteration of both functions, the sudoku remains the same, return the sudoku.
+    Input: A sudoku in dictionary form.
+    Output: The resulting sudoku in dictionary form.
+    """
+    # TODO: modify this function
+    solved_values = [box for box in values.keys() if len(values[box]) == 1]
+    stalled = False
+    while not stalled:
+        solved_values_before = len([box for box in values.keys() if len(values[box]) == 1])
+        values = eliminate(values)
+        values = naked_twins(values)
+        values = only_choice(values)
+        solved_values_after = len([box for box in values.keys() if len(values[box]) == 1])
+        stalled = solved_values_before == solved_values_after
+        if len([box for box in values.keys() if len(values[box]) == 0]):
+            return False
+    return values
 
 
 def search(values):
-    """Apply depth first search to solve Sudoku puzzles in order to solve puzzles
-    that cannot be solved by repeated reduction alone.
-
-    Parameters
-    ----------
-    values(dict)
-        a dictionary of the form {'box_name': '123456789', ...}
-
-    Returns
-    -------
-    dict or False
-        The values dictionary with all boxes assigned or False
-
-    Notes
-    -----
-    You should be able to complete this function by copying your code from the classroom
-    and extending it to call the naked twins strategy.
-    """
-    # TODO: Copy your code from the classroom to complete this function
-    raise NotImplementedError
+    "Using depth-first search and propagation, try all possible values."
+    # First, reduce the puzzle using the previous function
+    values = reduce_puzzle(values)
+    if values is False:
+        return False ## Failed earlier
+    if all(len(values[s]) == 1 for s in boxes):
+        return values ## Solved!
+    # Choose one of the unfilled squares with the fewest possibilities
+    n,s = min((len(values[s]), s) for s in boxes if len(values[s]) > 1)
+    # Now use recurrence to solve each one of the resulting sudokus, and
+    for value in values[s]:
+        new_sudoku = values.copy()
+        new_sudoku[s] = value
+        attempt = search(new_sudoku)
+        if attempt:
+            return attempt
 
 
 def solve(grid):
@@ -137,7 +140,7 @@ def solve(grid):
     ----------
     grid(string)
         a string representing a sudoku grid.
-        
+
         Ex. '2.............62....1....7...6..8...3...9...7...6..4...4....8....52.............3'
 
     Returns
@@ -156,11 +159,11 @@ if __name__ == "__main__":
     result = solve(diag_sudoku_grid)
     display(result)
 
-    try:
-        import PySudoku
-        PySudoku.play(grid2values(diag_sudoku_grid), result, history)
+    # try:
+    #     import PySudoku
+    #     PySudoku.play(grid2values(diag_sudoku_grid), result, history)
 
-    except SystemExit:
-        pass
-    except:
-        print('We could not visualize your board due to a pygame issue. Not a problem! It is not a requirement.')
+    # except SystemExit:
+    #     pass
+    # except:
+    #     print('We could not visualize your board due to a pygame issue. Not a problem! It is not a requirement.')
